@@ -1,5 +1,5 @@
 /*
- * Chapter 1 -- Arrays and Strings
+ * Arrays and Strings
  */
 
 #include <cstdio>
