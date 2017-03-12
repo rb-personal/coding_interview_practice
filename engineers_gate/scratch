@@ -1,0 +1,32 @@
+    char mpid[4];
+    char X;
+
+    if (NULL == fgets(_buff, sizeof(_buff), _fp)) {
+      return false;
+    }
+
+    if (EOF == sscanf(_buff,
+		      "%lu,%s,%lu,%c,%d,%u,%s,%c\n",
+		      &msg._time_ms,
+		      msg._ticker,
+		      &msg._order_id,
+		      &msg._msg_type,
+		      &msg._qty,
+		      &msg._price,
+		      mpid, &X))
+      return false;
+
+    // do {
+
+    //   msg._time_ms = atol(strtok())
+    //   // auto rc
+    //   //	= fscanf(_fp, "%lu,%s,%lu,%c,%d,%u,%u,%c",
+    //   //		 &msg._time_ms,
+    //   //		 msg._ticker,
+    //   //		 &msg._order_id,
+    //   //		 &msg._msg_type,
+    //   //		 &msg._qty,
+    //   //		 &msg._price,
+    //   //		 &mpid, &X);
+
+    // } while (msg._msg_type == 'T' || msg._msg_type == 'X');
