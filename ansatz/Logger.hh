@@ -21,7 +21,7 @@ using namespace std;
 
 static const char *LogEnd = "\n";
 
-class Logger : public ostream {
+class Logger {
  private:
   void write_to_disk(void);
   inline void print_intro(void)

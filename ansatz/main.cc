@@ -4,7 +4,7 @@
 void thread_func(void)
 {
   for (int i = 0; i < 10; ++i)
-    Log << "BLAH" << rand() << "FOO" << LogEnd;
+    LogVERBOSE << "BLAH" << rand() << "FOO" << LogEnd;
 }
 
 int main(int argc, char **argv)
