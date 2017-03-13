@@ -1,5 +1,5 @@
-#ifndef __LOGGER_H__
-#define __LOGGER_H__
+#ifndef __LOGGER_HH__
+#define __LOGGER_HH__
 
 #include <iostream>
 #include <mutex>
@@ -19,7 +19,7 @@
 
 using namespace std;
 
-string LogEnd("\n");
+static const char *LogEnd = "\n";
 
 class Logger : public ostream {
  private:
@@ -30,32 +30,27 @@ class Logger : public ostream {
   deque<string> _records;
   bool _print_intro;
 
-  // Note -- not using atomics b/c assuming x86 strong memory ordering
+  // Note: Not using atomics b/c assuming
+  // x86 strong memory ordering
   bool _stop_dw;
   bool _pause_dw;
 
   thread _dw;
 
  public:
-  Logger(char *dsc);
+  Logger(const char *dsc);
   Logger(void);
   ~Logger(void);
 
   void start(void);
 
   Logger& operator<<(int value);
-  Logger& operator<<(string &value);
+  Logger& operator<<(const char *value);
 };
 
-Logger Log;
-
-/* Logger LogINFO("INFO"); */
-/* LogINFO.start(); */
-
-/* Logger LogDEBUG("DEBUG"); */
-/* LogDEBUG.start(); */
-
-/* Logger LogVERBOSE("VERBOSE"); */
-/* LogVERBOSE.start(); */
+static Logger Log;
+static Logger LogINFO("INFO");
+static Logger LogDEBUG("DEBUG");
+static Logger LogVERBOSE("VERBOSE");
 
 #endif

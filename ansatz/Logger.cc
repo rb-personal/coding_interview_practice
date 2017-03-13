@@ -1,12 +1,14 @@
-#include "Logger.h"
-Logger::Logger(char *dsc)
+#include "Logger.hh"
+#include <cstring>
+
+Logger::Logger(const char *dsc)
   : _desc(dsc),
     _print_intro(true),
     _stop_dw(false),
     _pause_dw(false),
     _dw()
 {
-  (*this) << _desc;
+  start();
 }
 
 Logger::Logger(void)
@@ -15,7 +17,9 @@ Logger::Logger(void)
     _stop_dw(false),
     _pause_dw(false),
     _dw()
-{}
+{
+  start();
+}
 
 Logger::~Logger(void)
 {
@@ -38,7 +42,6 @@ Logger::write_to_disk(void)
       if(!_records.empty()) {
 	auto &r = _records.front();
 	cout << r;
-	if (r.compare(LogEnd) == 0) cout << _desc;
 	_records.pop_front();
       }
     }
@@ -48,7 +51,6 @@ Logger::write_to_disk(void)
       while(!_records.empty()) {
 	auto &r = _records.front();
 	cout << r;
-	if (r.compare(LogEnd) == 0) cout << _desc;
 	_records.pop_front();
       }
       break;
@@ -64,11 +66,11 @@ Logger::operator<<(int value) {
   ostringstream oss;
   if (_print_intro) {
     auto result = time(nullptr);
-    oss << "_desc "
-	<< this_thread::get_id()
-	<< " "
-	<< asctime(localtime(&result))
-	<< ": ";
+    oss << _desc;
+    if (!_desc.empty()) oss << " ";
+    oss << "Thread ID: 0x" << hex << this_thread::get_id() << " ";
+    //oss << asctime(localtime(&result)) << ": ";
+    oss << " Time: " << result << ": ";
     _print_intro = false;
   }
   oss << value << " ";
@@ -79,24 +81,26 @@ Logger::operator<<(int value) {
 }
 
 Logger&
-Logger::operator<<(string &value) {
+Logger::operator<<(const char *value) {
   _pause_dw = true;
   lock_guard<mutex> guard(_mutex);
 
   ostringstream oss;
   if (_print_intro) {
     auto result = time(nullptr);
-    oss << "_desc "
-	<< this_thread::get_id()
-	<< " "
-	<< asctime(localtime(&result))
-	<< ": ";
+    oss << _desc;
+    if (!_desc.empty()) oss << " ";
+    oss << "Thread ID: 0x" << hex <<  this_thread::get_id() << " ";
+    //oss << asctime(localtime(&result)) << ": ";
+    oss << " Time: " << result << ": ";
     _print_intro = false;
   }
   oss << value << " ";
   _records.push_back(oss.str());
 
-  if (0 == value.compare(LogEnd)) _print_intro = true;
+  if (0 == strcmp(value, LogEnd)) {
+    _print_intro = true;
+  }
 
   _pause_dw = false;
   return *this;

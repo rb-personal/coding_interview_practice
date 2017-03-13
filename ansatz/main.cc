@@ -1,9 +1,9 @@
-#include "Logger.h"
+#include "Logger.hh"
 
 int main(int argc, char **argv)
 {
-  Log.start();
 
-  Log << 5;
+  Log << "Hello" << 5 << LogEnd;
+  LogINFO << "BLAH" << rand() << "FOO" << LogEnd;
   return 0;
 }
