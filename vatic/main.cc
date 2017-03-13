@@ -12,14 +12,7 @@ int main
     exit(EXIT_FAILURE);
   }
 
-#ifdef BIG_BUFF
-  auto bytes
-    = sprintf(big_buff_iter,
-	      "OPEN_TIME,CLOSE_TIME,SYMBOL,QUANTITY,PNL,OPEN_SIDE,CLOSE_SIDE,OPEN_PRICE,CLOSE_PRICE,OPEN_BID,CLOSE_BID,OPEN_ASK,CLOSE_ASK,OPEN_LIQUDITY,CLOSE_LIQUIDITY\n");
-  big_buff_iter += bytes;
-#else
-  printf("OPEN_TIME,CLOSE_TIME,SYMBOL,QUANTITY,PNL,OPEN_SIDE,CLOSE_SIDE,OPEN_PRICE,CLOSE_PRICE,OPEN_BID,CLOSE_BID,OPEN_ASK,CLOSE_ASK,OPEN_LIQUDITY,CLOSE_LIQUIDITY\n");
-#endif
+  printf("OPEN_TIME,CLOSE_TIME,SYMBOL,QUANTITY,PNL,OPEN_SIDE,CLOSE_SIDE,OPEN_PRICE,CLOSE_PRICE,OPEN_BID,CLOSE_BID,OPEN_ASK,CLOSE_ASK,OPEN_LIQUIDITY,CLOSE_LIQUIDITY\n");
 
   // file management
   ifstream quotes_file(argv[1]);
@@ -69,20 +62,6 @@ int main
 	  }
 
 	  // Design Note: Custom tokenizer is faster
-#if 0
-	  stringstream q_linestream(q_line);
-	  getline(q_linestream, q_cell, ',');
-	  quote.set_time(stoi(q_cell));
-
-	  getline(q_linestream, quote_instrument, ',');
-
-	  getline(q_linestream, q_cell, ',');
-	  quote.set_bid(stof(q_cell));
-
-	  getline(q_linestream, q_cell, ',');
-	  quote.set_ask(stof(q_cell));
-#endif
-
 	  size_t start = 0;
 	  size_t end = q_line.find_first_of(',');
 	  q_tokens.clear();
@@ -118,23 +97,6 @@ int main
 	    break;
 	  }
 
-#if 0
-	  stringstream t_linestream(t_line);
-	  getline(t_linestream, t_cell, ',');
-	  trade.set_time(stoi(t_cell));
-
-	  getline(t_linestream, trade_instrument, ',');
-
-	  getline(t_linestream, t_cell, ',');
-	  trade.set_side(t_cell[0]);
-
-	  getline(t_linestream, t_cell, ',');
-	  trade.set_price(stof(t_cell));
-
-	  getline(t_linestream, t_cell, ',');
-	  trade.set_qty(stoi(t_cell));
-#endif
-
 	  size_t start = 0;
 	  size_t end = t_line.find_first_of(',');
 	  t_tokens.clear();
@@ -149,7 +111,7 @@ int main
 	  trade.set_price(stof(t_tokens[3]));
 	  trade.set_qty(stoi(t_tokens[4]));
 
-	  trade_instrument = q_tokens[1];
+	  trade_instrument = t_tokens[1];
 
 	  fresh_trade = true;
 	} while (!fresh_trade);
@@ -183,18 +145,13 @@ int main
     }
     else {
       // quote and trade are both stale
+      break;
     }
 
     if (quotes_finished && trades_finished) break;
   }
 
   // cleanup
-#ifdef BIG_BUFF
-  flush_big_buff();
-#endif
-  printf("Done\n");
-  fflush(stdout);
-
   quotes_file.close();
   trades_file.close();
 }
@@ -229,50 +186,62 @@ void process_trade
   read_trade = true;
   fresh_trade = false;
 
-  if (open_positions.find(instrument) == open_positions.end()) {
-    open_positions.insert({instrument, deque<state_t>()});
+  if (open_quotes.find(instrument) == open_quotes.end()) {
+    open_quotes.insert({instrument, deque<quote_t>()});
+  }
+  if (open_trades.find(instrument) == open_trades.end()) {
+    open_trades.insert({instrument, deque<trade_t>()});
   }
 
-  auto &i_pos = open_positions[instrument];
+
+  auto &i_oqs = open_quotes[instrument];
+  auto &i_ots = open_trades[instrument];
   auto &q = book[instrument];
-  if (i_pos.empty()) {
+
+  if (i_oqs.empty()) {
     // creating a new position
-    i_pos.push_back({q, t});
+    i_oqs.push_back(q);
+    i_ots.push_back(t);
     return;
   }
 
-  auto &i_pos_f = i_pos.front();
-  if (t.get_side() == i_pos_f.second.get_side()) {
+  auto &i_ots_f = i_ots.front();
+  if (t.get_side() == i_ots_f.get_side()) {
     // increasing position
-    i_pos.push_back({q, t});
+    i_oqs.push_back(q);
+    i_ots.push_back(t);
     return;
   }
 
   // reducing/closing positions
   int32_t qtc = t.get_sqty();
   while (qtc != 0) {
-    if (i_pos.empty()) {
+    if (i_ots.empty()) {
       // reversed the overall position
-      i_pos.push_back
-	({q, {t.get_time(), t.get_side(), t.get_price(), abs(qtc)}});
+      i_oqs.push_back(q);
+      i_ots.push_back({t.get_time(), t.get_side(), t.get_price(), abs(qtc)});
       break;
     }
 
-    auto &oq = i_pos_f.first;
-    auto &ot = i_pos_f.second;
+    auto &oq = i_oqs.front();
+    auto &ot = i_ots.front();
 
     if (abs(qtc) >= ot.get_qty()) {
       // Will exhaust this open trade
       generate_report
-	(instrument, i_pos_f, q, t, -ot.get_sqty());
+	(instrument, oq, ot, q, t, -ot.get_sqty());
+
       qtc += ot.get_sqty();
-      i_pos.pop_front();
+
+      i_oqs.pop_front();
+      i_ots.pop_front();
+
       if (qtc == 0) break;
     }
     else if (abs(qtc) < ot.get_qty()) {
       // Won't exhaust
       generate_report
-	(instrument, i_pos_f, q, t, qtc);
+	(instrument, oq, ot, q, t, qtc);
       ot.reduce(abs(qtc));
       qtc = 0;
       break;

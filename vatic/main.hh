@@ -1,8 +1,6 @@
 #ifndef __MAIN_HH__
 #define __MAIN_HH__
 
-#define BIG_BUFF
-
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -52,6 +50,8 @@ public:
     return out;
   }
 
+  ~quote_t(void) = default;
+
   // accessors
   inline uint32_t
   get_time(void) const
@@ -92,6 +92,8 @@ public:
   trade_t(uint32_t time, char side, float price, int32_t qty)
     : _time(time), _side(side), _price(price), _qty(qty)
   {}
+
+  ~trade_t(void) = default;
 
   // printer
   inline friend ostream&
@@ -151,8 +153,9 @@ private:
 };
 //static_assert(sizeof(trade_t) <= CACHE_LINE_SIZE);
 
+// Didn't do this b/c I was running into some weird allocator issues
 // type aliasing
-using state_t = pair<quote_t, trade_t>;
+//using state_t = pair<quote_t, trade_t>;
 
 // function prototypes
 void process_quote
@@ -188,7 +191,6 @@ inline char bid_liquidity
     return 'A';
 
   // Should be unreachable
-  exit(EXIT_FAILURE);
   return 'X';
 }
 
@@ -205,53 +207,22 @@ inline char ask_liquidity
     return 'A';
 
   // Should be unreachable
-  exit(EXIT_FAILURE);
   return 'X';
 }
-
-const unsigned BIG_BUFF_SIZE = (1<<13); // 4K Bytes
-char big_buff[BIG_BUFF_SIZE];
-char *big_buff_iter = big_buff;
-
-inline
-size_t big_buff_bytes
-(void)
-{
-  return (big_buff_iter - big_buff);
-}
-
-inline
-size_t big_buff_bytes_remaining
-(void)
-{
-  return (BIG_BUFF_SIZE - big_buff_bytes());
-}
-
-inline
-void flush_big_buff
-(void)
-{
-  if ( -1 == write(fileno(stdout), big_buff, big_buff_bytes()) )
-    exit(EXIT_FAILURE);
-  big_buff_iter = big_buff;
-}
-
-custom_timer_t fm_timer("FMult"), p_timer("Print");
 
 static inline
 void generate_report
 (
  const string &instrument,
- const state_t &open_state,
+ const quote_t &oq,
+ const trade_t &ot,
  const quote_t &cq,
  const trade_t &ct,
  const int32_t sqty
  )
 {
-  auto &oq = open_state.first;
-  auto &ot = open_state.second;
-
   char o_liq, c_liq;
+
   if (ct.get_side() == 'B') {
     // Buy Execution
     o_liq = ask_liquidity(ot,oq);
@@ -266,41 +237,24 @@ void generate_report
   float paired_qty = static_cast<float>(abs(sqty));
   auto pnl = paired_qty * (ct.get_price() - ot.get_price());
 
-#ifdef BIG_BUFF
-  auto bytes = sprintf(big_buff_iter,
-		       "%u,%u,"
-		       "%s,%u,%.2f,"
-		       "%c,%c,"
-		       "%.2f,%.2f,"
-		       "%.2f,%.2f,%.2f,%.2f,"
-		       "%c,%c\n",
-		       ot.get_time(), ct.get_time(),
-		       instrument.c_str(), abs(sqty), pnl,
-		       ((sqty > 0) ? 'S':'B'), ((sqty > 0) ? 'B':'S'),
-		       ot.get_price(), ct.get_price(),
-		       oq.get_bid(), cq.get_bid(), oq.get_ask(), cq.get_ask(),
-		       o_liq, c_liq);
-  big_buff_iter += bytes;
-  if (big_buff_bytes_remaining() < 100) flush_big_buff();
-#else
-  auto bytes = printf("%u,%u,"
-		      "%s,%u,%.2f,"
-		      "%c,%c,"
-		      "%.2f,%.2f,"
-		      "%.2f,%.2f,%.2f,%.2f,"
-		      "%c,%c\n",
-		      ot.get_time(), ct.get_time(),
-		      instrument.c_str(), abs(sqty), pnl,
-		      ((sqty > 0) ? 'S':'B'), ((sqty > 0) ? 'B':'S'),
-		      ot.get_price(), ct.get_price(),
-		      oq.get_bid(), cq.get_bid(), oq.get_ask(), cq.get_ask(),
-		      o_liq, c_liq);
-#endif
+  printf("%u,%u,"
+	 "%s,%u,%.2f,"
+	 "%c,%c,"
+	 "%.2f,%.2f,"
+	 "%.2f,%.2f,%.2f,%.2f,"
+	 "%c,%c\n",
+	 ot.get_time(), ct.get_time(),
+	 instrument.c_str(), abs(sqty), pnl,
+	 ((sqty > 0) ? 'S':'B'), ((sqty > 0) ? 'B':'S'),
+	 ot.get_price(), ct.get_price(),
+	 oq.get_bid(), cq.get_bid(), oq.get_ask(), cq.get_ask(),
+	 o_liq, c_liq);
 }
 
 // globals
 unordered_map<string, quote_t> book;
-unordered_map<string, deque<state_t> > open_positions;
+unordered_map<string, deque<quote_t> > open_quotes;
+unordered_map<string, deque<trade_t> > open_trades;
 
 #ifdef _MULTITHREADED
 unordered_set<string> shared_records;
