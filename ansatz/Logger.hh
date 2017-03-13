@@ -24,6 +24,19 @@ static const char *LogEnd = "\n";
 class Logger : public ostream {
  private:
   void write_to_disk(void);
+  inline void print_intro(void)
+  {
+    if (_print_intro) {
+      ostringstream oss;
+      auto result = time(nullptr);
+      oss << _desc;
+      oss << "Thread ID: 0x"
+	  << hex <<  this_thread::get_id() << " ";
+      oss << " Time: " << result << ": ";
+      _print_intro = false;
+      _records.push_back(oss.str());
+    }
+  }
 
   string _desc;
   mutex _mutex;

@@ -8,6 +8,7 @@ Logger::Logger(const char *dsc)
     _pause_dw(false),
     _dw()
 {
+  _desc = _desc + " ";
   start();
 }
 
@@ -63,16 +64,8 @@ Logger::operator<<(int value) {
   _pause_dw = true;
   lock_guard<mutex> guard(_mutex);
 
+  print_intro();
   ostringstream oss;
-  if (_print_intro) {
-    auto result = time(nullptr);
-    oss << _desc;
-    if (!_desc.empty()) oss << " ";
-    oss << "Thread ID: 0x" << hex << this_thread::get_id() << " ";
-    //oss << asctime(localtime(&result)) << ": ";
-    oss << " Time: " << result << ": ";
-    _print_intro = false;
-  }
   oss << value << " ";
   _records.push_back(oss.str());
 
@@ -85,18 +78,8 @@ Logger::operator<<(const char *value) {
   _pause_dw = true;
   lock_guard<mutex> guard(_mutex);
 
-  ostringstream oss;
-  if (_print_intro) {
-    auto result = time(nullptr);
-    oss << _desc;
-    if (!_desc.empty()) oss << " ";
-    oss << "Thread ID: 0x" << hex <<  this_thread::get_id() << " ";
-    //oss << asctime(localtime(&result)) << ": ";
-    oss << " Time: " << result << ": ";
-    _print_intro = false;
-  }
-  oss << value << " ";
-  _records.push_back(oss.str());
+  print_intro();
+  _records.push_back(string(value) + " ");
 
   if (0 == strcmp(value, LogEnd)) {
     _print_intro = true;
