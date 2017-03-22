@@ -1,24 +1,27 @@
 #include "Logger.hh"
 #include <cstring>
 
-Logger::Logger(const char *dsc)
+void
+Logger::common_constructor(void)
+{
+  _print_intro = true;
+  _stop_dw = false;
+  _pause_dw = false;
+}
+
+Logger::Logger(char const *dsc)
   : _desc(dsc),
-    _print_intro(true),
-    _stop_dw(false),
-    _pause_dw(false),
     _dw()
 {
-  _desc = _desc + " ";
+  common_constructor();
   start();
 }
 
 Logger::Logger(void)
   : _desc(""),
-    _print_intro(true),
-    _stop_dw(false),
-    _pause_dw(false),
     _dw()
 {
+  common_constructor();
   start();
 }
 
@@ -39,52 +42,47 @@ Logger::write_to_disk(void)
 {
   while (1) {
     if (!_pause_dw) {
-      lock_guard<mutex> guard(_mutex);
-      if(!_records.empty()) {
-	auto &r = _records.front();
-	cout << r;
-	_records.pop_front();
-      }
+      lock_guard<recursive_mutex> guard(_mutex);
+      print();
     }
 
     if (unlikely(_stop_dw)) {
-      lock_guard<mutex> guard(_mutex);
-      while(!_records.empty()) {
-	auto &r = _records.front();
-	cout << r;
-	_records.pop_front();
-      }
+      lock_guard<recursive_mutex> guard(_mutex);
+      while(!_records.empty()) print();
       break;
     }
   }
 }
 
 Logger&
-Logger::operator<<(int value) {
+Logger::operator<<(const int value) noexcept
+{
   _pause_dw = true;
-  lock_guard<mutex> guard(_mutex);
-
-  print_intro();
-  ostringstream oss;
-  oss << value << " ";
-  _records.push_back(oss.str());
-
-  _pause_dw = false;
+  _oss << value;
+  {
+    lock_guard<recursive_mutex> guard(_mutex);
+    _records.push_back({
+	this_thread::get_id(),
+	  time(nullptr),
+	  _oss.str()});
+  }
+  _oss.str("");
+  _oss.clear();
   return *this;
 }
 
 Logger&
-Logger::operator<<(const char *value) {
+Logger::operator<<(char const *value) noexcept
+{
   _pause_dw = true;
-  lock_guard<mutex> guard(_mutex);
-
-  print_intro();
-  _records.push_back(string(value) + " ");
-
-  if (0 == strcmp(value, LogEnd)) {
-    _print_intro = true;
+  {
+    lock_guard<recursive_mutex> guard(_mutex);
+    _records.push_back({
+	this_thread::get_id(),
+	  time(nullptr),
+	  value});
   }
-
-  _pause_dw = false;
+  if (0 == strcmp(value, LogEnd))
+    _pause_dw = false;
   return *this;
 }

@@ -1,3 +1,6 @@
+#ifndef __A_HH__
+#define __A_HH__
+
 template<typename t>
 t operator+(const t &lhs, const t&rhs)
 {
@@ -82,3 +85,5 @@ public:
   t& operator* (void) { return *_data; }
   t* operator->(void) { return get(); }
 };
+
+#endif

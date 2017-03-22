@@ -3,13 +3,13 @@
 
 void thread_func(void)
 {
-  for (int i = 0; i < 10; ++i)
+  for (int i = 0; i < 5; ++i)
     LogVERBOSE << "BLAH" << rand() << "FOO" << LogEnd;
 }
 
 int main(int argc, char **argv)
 {
-  const unsigned NUM_THREADS = 10;
+  const unsigned NUM_THREADS = 1000;
   vector<thread> threads;
   for (auto i = 0u; i < NUM_THREADS; ++i) {
     threads.push_back(thread(thread_func));
