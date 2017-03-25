@@ -54,11 +54,17 @@ private:
   static_assert(sizeof(node_t) == CACHE_LINE_SIZE);
 
   //
-  alignas(CACHE_LINE_SIZE) node_t *_first;
-  alignas(CACHE_LINE_SIZE) node_t *_last;
-  alignas(CACHE_LINE_SIZE) std::atomic<bool> _wr_lock;
-  alignas(CACHE_LINE_SIZE) std::atomic<bool> _stop_dw;
+  node_t *_first;
+  uint8_t pad0[CACHE_LINE_SIZE - sizeof(node_t*)];
 
+  node_t *_last;
+  uint8_t pad1[CACHE_LINE_SIZE - sizeof(node_t*)];
+
+  std::atomic<bool> _wr_lock;
+  uint8_t pad2[CACHE_LINE_SIZE - sizeof(node_t*)];
+
+  std::atomic<bool> _stop_dw;
+  uint8_t pad3[CACHE_LINE_SIZE - sizeof(node_t*)];
 
   std::string _desc;
   std::thread _dw;
