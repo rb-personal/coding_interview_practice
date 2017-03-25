@@ -9,10 +9,10 @@
 #include <sstream>
 #include <atomic>
 #include <tuple>
+#include <inttypes.h>
 
 static const size_t CACHE_LINE_SIZE = 64;
-
-#define _ALIGN alignas(CACHE_LINE_SIZE)
+static char const *LogEnd = "\n";
 
 inline
 uint64_t rdtscp
@@ -29,16 +29,21 @@ private:
   Logger& operator=(const Logger &other) = delete;
 
   //
-  class _ALIGN node_t {
+  class alignas(CACHE_LINE_SIZE) node_t {
+  public:
     enum class node_type_t : uint8_t { INT, STRING };
 
-  public:
     node_t(void) = delete;
     node_t(int val)
       : _type(node_type_t::INT), _val_i(val), _id(std::this_thread::get_id()), _next(nullptr) {}
 
     node_t(std::string *val)
       : _type(node_type_t::STRING), _val(val), _id(std::this_thread::get_id()), _next(nullptr) {}
+
+    inline bool is_log_end(void) {
+      if (_val == nullptr) return false;
+      return (_val->compare(LogEnd) == 0);
+    }
 
     node_type_t _type;
     int _val_i;
@@ -49,13 +54,15 @@ private:
   static_assert(sizeof(node_t) == CACHE_LINE_SIZE);
 
   //
-  _ALIGN node_t *_first;
-  _ALIGN node_t *_last;
-  _ALIGN std::atomic<bool> _wr_lock;
+  alignas(CACHE_LINE_SIZE) node_t *_first;
+  alignas(CACHE_LINE_SIZE) node_t *_last;
+  alignas(CACHE_LINE_SIZE) std::atomic<bool> _wr_lock;
+  alignas(CACHE_LINE_SIZE) std::atomic<bool> _stop_dw;
+
 
   std::string _desc;
-  bool _stop_dw;
   std::thread _dw;
+  bool _print_intro;
 
   //
   void common_constructor
@@ -67,7 +74,8 @@ private:
   void write_to_disk
   (void);
 
-  std::deque<node_t> _a;
+  bool print
+  (void);
 
 public:
   Logger
@@ -83,8 +91,7 @@ public:
   Logger& operator<<(char const* value) noexcept;
 };
 
-static char const *LogEnd = "\n";
-
+//
 static Logger Log;
 static Logger LogINFO("INFO");
 static Logger LogDEBUG("DEBUG");

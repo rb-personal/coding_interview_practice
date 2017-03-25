@@ -10,11 +10,12 @@ Logger::common_constructor
 {
   _first = _last = new node_t(nullptr);
   _wr_lock = false;
+  _stop_dw = false;
 }
 
 Logger::Logger
 (char const *dsc)
-  : _desc(dsc), _stop_dw(false), _dw()
+  : _desc(dsc), _dw()
 {
   common_constructor();
   start();
@@ -22,7 +23,7 @@ Logger::Logger
 
 Logger::Logger
 (void)
-  : _desc(""), _stop_dw(false), _dw()
+  : _desc(""), _dw()
 {
   common_constructor();
   start();
@@ -31,18 +32,11 @@ Logger::Logger
 Logger::~Logger
 (void)
 {
+
   _stop_dw = true;
   if (_dw.joinable()) _dw.join();
 
-  int j = 0;
-  while (_first != nullptr) {
-    auto tmp = _first;
-    _first = _first->_next;
-    delete tmp->_val;
-    delete tmp;
-    ++j;
-  }
-  cout << "num deleted " << j << endl;
+  while(print());
 }
 
 void
@@ -56,36 +50,12 @@ void
 Logger::write_to_disk
 (void)
 {
-  bool print_intro = true;
-  static int i = 0;
+  _print_intro = true;
 
   while (!_stop_dw) {
     usleep(100);
-    auto the_first = _first;
-    auto the_next = the_first->_next.load();
-
-    if (the_next != nullptr) {
-      //
-      auto v = the_next->_val;
-      the_next->_val = nullptr;
-      _first = the_next;
-
-      //
-      if (print_intro) {
-	cout << _desc << " " << time(nullptr) << " " << the_next->_id;
-	++i;
-      }
-
-      cout << " " << (*v) << endl;
-      print_intro = (v->compare(LogEnd) == 0);
-
-      //
-      delete v;
-      delete the_first;
-    }
+    print();
   }
-
-  cout << i << endl;
 }
 
 Logger&
@@ -104,13 +74,34 @@ Logger&
 Logger::operator<<
 (char const *value) noexcept
 {
-  static size_t i = 0;
-  ++i;
   auto tmp = new node_t(new string(value));
   while (_wr_lock.exchange(true));
   _last->_next = tmp;
   _last = tmp;
   _wr_lock = false;
-  //cout << i << endl;
   return *this;
+}
+
+bool
+Logger::print
+(void)
+{
+  auto the_first = _first;
+  auto the_next = the_first->_next.load();
+  if (the_next != nullptr) {
+    if (_print_intro)
+      cout << _desc << " " << time(nullptr) << " " << the_next->_id;
+    _print_intro = (the_next->is_log_end());
+
+    if (the_next->_type == node_t::node_type_t::INT)
+      printf(" %d", the_next->_val_i);
+    else
+      printf(" %s", the_next->_val->c_str());
+
+    _first = the_next;
+    delete the_first;
+    return true;
+  }
+
+  return false;
 }
