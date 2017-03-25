@@ -61,10 +61,11 @@ private:
   uint8_t pad1[CACHE_LINE_SIZE - sizeof(node_t*)];
 
   std::atomic<bool> _wr_lock;
-  uint8_t pad2[CACHE_LINE_SIZE - sizeof(node_t*)];
+  uint8_t pad2[CACHE_LINE_SIZE - sizeof(std::atomic<bool>)];
 
   std::atomic<bool> _stop_dw;
-  uint8_t pad3[CACHE_LINE_SIZE - sizeof(node_t*)];
+  uint8_t pad3[CACHE_LINE_SIZE - sizeof(std::atomic<bool>)];
+  //
 
   std::string _desc;
   std::thread _dw;
