@@ -2,7 +2,6 @@
 #define __LOGGER_HH__
 
 #include <iostream>
-#include <mutex>
 #include <string>
 #include <thread>
 #include <deque>
@@ -11,65 +10,80 @@
 #include <atomic>
 #include <tuple>
 
-#ifdef __GNUC__
-#define likely(x)   __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
-#else
-#define likely(x)   (x)
-#define unlikely(x) (x)
-#endif
+static const size_t CACHE_LINE_SIZE = 64;
 
-using namespace std;
+#define _ALIGN alignas(CACHE_LINE_SIZE)
 
-static char const *LogEnd = "\n";
+inline
+uint64_t rdtscp
+(void)
+{
+  uint64_t rax, rdx;
+  asm volatile ("rdtscp" : "=a"(rax), "=d"(rdx));
+  return (rdx<<32 | rax);
+}
 
 class Logger {
- private:
-  void common_constructor(void);
+private:
+  Logger(const Logger &other) = delete;
+  Logger& operator=(const Logger &other) = delete;
 
-  void write_to_disk(void);
+  //
+  class _ALIGN node_t {
+    enum class node_type_t : uint8_t { INT, STRING };
 
-  inline
-  void print(void) noexcept
-  {
-    if (_records.empty()) return;
-    auto &r = _records.front();
-    if (_print_intro)
-      cout << "[" << _desc         << "] "
-	   << "(" << get<1>(r) << ") "
-	   << "Thread: " << get<0>(r) << " -- ";
-    cout << get<2>(r);
-    _records.pop_front();
-    if (get<2>(r).compare(LogEnd) == 0) {
-      _print_intro = true;
-    }
-    else {
-      cout << " ";
-      _print_intro = false;
-    }
-  }
+  public:
+    node_t(void) = delete;
+    node_t(int val)
+      : _type(node_type_t::INT), _val_i(val), _id(std::this_thread::get_id()), _next(nullptr) {}
 
-  string _desc;
-  thread _dw;
+    node_t(std::string *val)
+      : _type(node_type_t::STRING), _val(val), _id(std::this_thread::get_id()), _next(nullptr) {}
 
-  recursive_mutex _mutex;
-  deque<tuple<thread::id, time_t, string> > _records;
+    node_type_t _type;
+    int _val_i;
+    std::string *_val;
+    std::thread::id _id;
+    std::atomic<node_t*> _next;
+  };
+  static_assert(sizeof(node_t) == CACHE_LINE_SIZE);
 
-  bool _print_intro;
+  //
+  _ALIGN node_t *_first;
+  _ALIGN node_t *_last;
+  _ALIGN std::atomic<bool> _wr_lock;
+
+  std::string _desc;
   bool _stop_dw;
-  bool _pause_dw;
-  ostringstream _oss;
+  std::thread _dw;
 
- public:
-  Logger(char const *dsc);
-  Logger(void);
-  ~Logger(void);
+  //
+  void common_constructor
+  (void);
 
-  void start(void);
+  void start
+  (void);
+
+  void write_to_disk
+  (void);
+
+  std::deque<node_t> _a;
+
+public:
+  Logger
+  (char const *dsc);
+
+  Logger
+  (void);
+
+  ~Logger
+  (void);
 
   Logger& operator<<(const int value) noexcept;
   Logger& operator<<(char const* value) noexcept;
 };
+
+static char const *LogEnd = "\n";
 
 static Logger Log;
 static Logger LogINFO("INFO");

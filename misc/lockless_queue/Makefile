@@ -2,7 +2,7 @@ CXX=g++
 SRC=$(wildcard *.cc)
 HDR=$(wildcard *.hh)
 OBJ=$(patsubst %.cc, %.o, $(wildcard *.cc))
-EXE=logger.exe
+EXE=lockless_queue.exe
 CFLAGS=-std=c++0x -march=native -O3
 LFLAGS=-pthread
 

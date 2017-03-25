@@ -1,88 +1,116 @@
 #include "Logger.hh"
 #include <cstring>
+#include <unistd.h>
+
+using namespace std;
 
 void
-Logger::common_constructor(void)
+Logger::common_constructor
+(void)
 {
-  _print_intro = true;
-  _stop_dw = false;
-  _pause_dw = false;
+  _first = _last = new node_t(nullptr);
+  _wr_lock = false;
 }
 
-Logger::Logger(char const *dsc)
-  : _desc(dsc),
-    _dw()
-{
-  common_constructor();
-  start();
-}
-
-Logger::Logger(void)
-  : _desc(""),
-    _dw()
+Logger::Logger
+(char const *dsc)
+  : _desc(dsc), _stop_dw(false), _dw()
 {
   common_constructor();
   start();
 }
 
-Logger::~Logger(void)
+Logger::Logger
+(void)
+  : _desc(""), _stop_dw(false), _dw()
+{
+  common_constructor();
+  start();
+}
+
+Logger::~Logger
+(void)
 {
   _stop_dw = true;
   if (_dw.joinable()) _dw.join();
+
+  int j = 0;
+  while (_first != nullptr) {
+    auto tmp = _first;
+    _first = _first->_next;
+    delete tmp->_val;
+    delete tmp;
+    ++j;
+  }
+  cout << "num deleted " << j << endl;
 }
 
 void
-Logger::start(void)
+Logger::start
+(void)
 {
   _dw = thread(&Logger::write_to_disk, this);
 }
 
 void
-Logger::write_to_disk(void)
+Logger::write_to_disk
+(void)
 {
-  while (1) {
-    if (!_pause_dw) {
-      lock_guard<recursive_mutex> guard(_mutex);
-      print();
-    }
+  bool print_intro = true;
+  static int i = 0;
 
-    if (unlikely(_stop_dw)) {
-      lock_guard<recursive_mutex> guard(_mutex);
-      while(!_records.empty()) print();
-      break;
+  while (!_stop_dw) {
+    usleep(100);
+    auto the_first = _first;
+    auto the_next = the_first->_next.load();
+
+    if (the_next != nullptr) {
+      //
+      auto v = the_next->_val;
+      the_next->_val = nullptr;
+      _first = the_next;
+
+      //
+      if (print_intro) {
+	cout << _desc << " " << time(nullptr) << " " << the_next->_id;
+	++i;
+      }
+
+      cout << " " << (*v) << endl;
+      print_intro = (v->compare(LogEnd) == 0);
+
+      //
+      delete v;
+      delete the_first;
     }
   }
+
+  cout << i << endl;
 }
 
 Logger&
-Logger::operator<<(const int value) noexcept
+Logger::operator<<
+(const int value) noexcept
 {
-  _pause_dw = true;
-  _oss << value;
-  {
-    lock_guard<recursive_mutex> guard(_mutex);
-    _records.push_back({
-	this_thread::get_id(),
-	  time(nullptr),
-	  _oss.str()});
-  }
-  _oss.str("");
-  _oss.clear();
+  auto tmp = new node_t(value);
+  while (_wr_lock.exchange(true));
+  _last->_next = tmp;
+  _last = tmp;
+  _wr_lock = false;
   return *this;
 }
 
 Logger&
-Logger::operator<<(char const *value) noexcept
+Logger::operator<<
+(char const *value) noexcept
 {
-  _pause_dw = true;
-  {
-    lock_guard<recursive_mutex> guard(_mutex);
-    _records.push_back({
-	this_thread::get_id(),
-	  time(nullptr),
-	  value});
-  }
-  if (0 == strcmp(value, LogEnd))
-    _pause_dw = false;
+  static size_t i = 0;
+  ++i;
+  auto tmp = new node_t(new string(value));
+  while (_wr_lock.exchange(true));
+  _last->_next = tmp;
+  _last = tmp;
+  _wr_lock = false;
+  //cout << i << endl;
   return *this;
 }
