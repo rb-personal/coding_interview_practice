@@ -1,0 +1,12 @@
+
+
+
+write a script
+
+- read *.zip files from input directory
+- generate files to output directory.
+
+- unzipped sample inputs are provided in ./input/unziped_sample/
+- desired outputs are provided in ./output/
+
+

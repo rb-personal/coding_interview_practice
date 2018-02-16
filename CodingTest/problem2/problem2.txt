@@ -1,0 +1,10 @@
+
+
+case2.csv has three columns
+Y, X1, X2
+
+1. read case2.csv and find a function
+  Y = func(X1, X2)
+
+2. plot your function in 3d surface (for -1 < X1, X2 < 1)
+
