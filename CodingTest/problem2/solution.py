@@ -1,11 +1,21 @@
 import csv
+from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn import svm
+from sklearn.metrics import mean_squared_error, r2_score
+from mpl_toolkits.mplot3d import Axes3D
+
+#mnist = input_data.read_data_sets('/tmp/data/', one_hot=False)
 
 # Data container
 Y_train = list()
 Y_test = list()
 X_train = list()
 X_test = list()
+
+scale = 1000000.0
 
 # Neural-Net hyper-parameters
 learning_rate = 0.1
@@ -21,60 +31,77 @@ num_classes = 1
 
 def get_data():
     # Read the data
-    with open ('case2.csv', 'r') as inputfile:
+    Ys = list()
+    Xs = list()
+
+    with open ('case3.csv', 'r') as inputfile:
         reader = csv.reader(inputfile)
         next(reader)
         counter = 0
         for row in reader:
-            if counter % 10 == 0:
-                Y_test.append(row[0])
-                X_test.append([row[1],row[2]])
-                counter += 1
-            else:
-                Y_train.append(row[0])
-                X_train.append([row[1],row[2]])
+            Ys.append(float(row[0]))
+            Xs.append([float(row[1]), float(row[2])])
 
+    # with open ('case3.csv', 'r') as inputfile:
+    #     reader = csv.reader(inputfile)
+    #     next(reader)
+    #     counter = 0
+    #     for row in reader:
+    #         y = float(row[0])
+    #         x0 = float(row[1])
+    #         x1 = float(row[2])
+    #         scaled = int(y * scale)
+    #         if counter % 10 == 0:
+    #             Y_test.append(y)
+    #             X_test.append([x0, x1])
+    #         else:
+    #             Y_train.append(y)
+    #             X_train.append([x0, x1])
+    #         counter += 1
 
-def neural_net(features):
-    layer_1 = tf.layers.dense(features, n_hidden_1)
-    layer_2 = tf.layers.dense(layer_1, n_hidden_2)
-    out_layer = tf.layers.dense(layer2, num_classes)
-    return out_layer
+    # x_np = np.array(X0s)
+    # y_np = np.array(X1s)
+    # z_np = np.array(Ys)
 
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter(x_np, y_np, z_np)
+    # ax.set_xlabel('X0')
+    # ax.set_ylabel('X1')
+    # ax.set_zlabel('Y')
+    # plt.show()
 
-def model_fn(features, labels, mode):
-    logits = neural_net(features)
+    y = np.array(Ys)
+    #print(y)
+    x = np.array(Xs)
+    #print(x)
 
-    pred_classes = tf.argmax(logits, axis=1)
-    pred_probas = tf.nn.softmax(logits)
-
-    if mode == tf.estimator.ModeKeys.PREDICT:
-        return tf.estimator.EstimatorSpec(mode, predictions=pred_classes)
-
-    loss_op = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
-        logits=logits, labels=tf.cast(labels, dtype=tf.float32)))
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
-    train_op = optimizer.minimize(loss_op, global_step=tf.train.get_global_step())
-
-    acc_op = tf.metrics.accuracy(labels=labels, predictions=pred_classes)
-
-    estim_specs = tf.estimator.EstimatorSpec(
-        mode=mode, predictions=pred_classes, loss=loss_op, train_op=train_op, eval_metric_ops={'accuracy':acc_op})
-
-    return estim_specs
+    svr_rbf = svm.SVR(kernel='rbf')
+    svr_lin = svm.SVR(kernel='linear')
+    svr_poly = svm.SVR(kernel='poly')
 
 
 def main():
     get_data()
 
+    # print(mnist.train.images)
+    # print(mnist.train.labels)
+    # print(mnist.train.images.shape)
+    # print(mnist.train.labels.shape)
+
+    # get_data()
+    # X_train_np = np.array(X_train, dtype='float')
+    # print(X_train_np)
+    # Y_train_np = np.array(Y_train, dtype='int')
+    # print(Y_train_np)
+
     # model = tf.estimator.Estimator(model_fn)
 
     # input_fn = tf.estimator.inputs.numpy_input_fn(
-    #     x=X_train, y=Y_train,
+    #     x={'train':X_train_np}, y=Y_train_np,
     #     batch_size = batch_size,
     #     num_epochs = None,
     #     shuffle=True)
-
     # model.train(input_fn, steps=num_steps)
 
     # input_fn = tf.estimator.inputs.numpy_input_fn(
